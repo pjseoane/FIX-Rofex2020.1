@@ -1,0 +1,7 @@
+quickfix==1.15.1
+http://www.quickfixengine.org/quickfix/doc/html/
+https://opensource.com/resources/python/gui-frameworks
+http://fixparser.targetcompid.com/?sharedlink=-MI_2Rb8wMr-sIKsHemW
+https://medium.com/@mdamelio/fix-protocol-bb7aaebeb2a7
+https://www.onixs.biz/fix-dictionary/5.0.sp2/fields_by_tag.html
+
