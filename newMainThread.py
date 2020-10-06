@@ -1,6 +1,6 @@
 import argparse
 import quickfix as fix
-from RofexEngine.RofexEngine6 import rofexEngine
+from RofexEngine.RofexEngine import rofexEngine
 #from application import Application # Application que vamos a extender
 from threading import Thread
 from getpass import getpass
