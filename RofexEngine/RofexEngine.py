@@ -6,7 +6,7 @@ import quickfix as fix
 import quickfix50sp2 as fix50
 import logging
 import texttable
-
+from RofexEngine import bots as bt
 
 logfix = logging.getLogger('FIX')  # 'FIX'
 from Logger.logger import setup_logger2
@@ -34,6 +34,7 @@ class rofexEngine(fix.Application):
         self.tickers = tickers
 
         self.allSecurities = {}
+        self.actualMarket = {}
         # self.msgToRofex = armarMensajes(self.usrID, self.targetCompID,self.allSecurities)
         self.tag35 = None
         # todo crear un diccionario que tenga el ultimo dato vio de un md
@@ -49,7 +50,6 @@ class rofexEngine(fix.Application):
         self.sessionID = sessionID
         logfix.warning("onCreate session OK, sessionID >> (%s)" % self.sessionID)
 
-
     def onLogon(self, sessionID):
         # onLogon notifies you when a valid logon has been established with a counter party. This is called when a
         # connection has been established and the FIX logon process has completed with both parties exchanging valid
@@ -58,6 +58,8 @@ class rofexEngine(fix.Application):
         logfix.critical("Logged OK, sessionID >> (%s)" % self.sessionID)
 
         self.secList()
+        self.suscribeMD(self.tickers, ['0', '1', '2', '4', '5', '6', '7', '8', 'B', 'C'])
+
         logfix.critical("onLogon, securitiesList Requested..., sessionID >> (%s)" % self.sessionID)
 
     def onLogout(self, sessionID):
@@ -135,7 +137,7 @@ class rofexEngine(fix.Application):
         # exception. This will result in the counterparty getting a reject informing them your application cannot
         # process those types of messages. An IncorrectTagValue can also be thrown if a field contains a value you do
         # not support.
-        # ACA SE PEOCESA LOS MENSAJES QUE ENTRAN
+        # ACA SE PROCESAN LOS MENSAJES QUE ENTRAN
         msg = self.formatMsg(message)
         tag35 = self.getTag35(message)
 
@@ -147,6 +149,7 @@ class rofexEngine(fix.Application):
 
         elif tag35 == 'y':  # Security List
             self.allSecurities = self.onMessage_SecurityList(message)
+            # self.allSecurities=msgProcessing.onMessage_SecurityListTEST(message, self.allSecurities)
 
             logfix.info("Securities List: allSecurities{} <-- fromApp >> (%s) " % msg)
             # print(self.allSecurities)
@@ -154,12 +157,49 @@ class rofexEngine(fix.Application):
         elif tag35 == 'W':  # MktData
             # print(self.getValue(message, fix.Symbol()))
             logfix.warning("MD <-- fromApp >> (%s) " % msg)
-            self.onMessage_MarketDataSnapshotFullRefresh2(message)
+            # self.onMessage_MarketDataSnapshotFullRefresh(message)
+            self.onMessage_MarketDataSnapshotFullRefreshToDict(message)
+            self.goRobot2()
 
         else:
             logfix.warning("Response <-- fromApp >> (%s) " % msg)
 
-    def onMessage_MarketDataSnapshotFullRefresh(self, message):
+    ### msg parser
+    def getTicker(self, msg):
+        return msg['instrumentId']['symbol']
+
+    def getBidPx(self, msg):
+        if len((msg['marketData']['BI'])) > 0:
+            return msg['marketData']['BI'][0]['price']
+        else:
+            return 0
+
+    def getOfferPx(self, msg):
+        if len((msg['marketData']['OF'])) > 0:
+            return msg['marketData']['OF'][0]['price']
+        else:
+            return 0
+
+    def getBidSize(self, msg):
+        if len((msg['marketData']['BI'])) > 0:
+            return msg['marketData']['BI'][0]['size']
+        else:
+            return 0
+
+    def getOfferSize(self, msg):
+        if len((msg['marketData']['OF'])) > 0:
+            return msg['marketData']['OF'][0]['size']
+        else:
+            return 0
+
+    def getBidDictActualMkt(self, ticker):
+        return self.getBid(self.actualMarket[ticker])
+
+    def getBidSizeDictActualMkt(self, ticker):
+        return self.getBidSize(self.actualMarket[ticker])
+
+    ###
+    def onMessage_MarketDataSnapshotFullRefreshTable(self, message):
         """
         onMessage - Market Data - Snapshot / Full Refresh
 
@@ -252,7 +292,15 @@ class rofexEngine(fix.Application):
 
         ## Broadcast JSON to WebSocket
 
-    def onMessage_MarketDataSnapshotFullRefresh2(self, message):
+    def onMessage_MarketDataSnapshotFullRefreshToDict(self, message):
+        #cada vez que entra un mensaje se procesa y se carga en el dict
+        mDict = (self.onMessage_MarketDataSnapshotFullRefresh(message))
+        self.actualMarket[self.getTicker(mDict)] = mDict
+        #print(mDict)
+
+
+
+    def onMessage_MarketDataSnapshotFullRefresh(self, message):
         """
         onMessage - Market Data - Snapshot / Full Refresh
 
@@ -347,14 +395,14 @@ class rofexEngine(fix.Application):
                 else:
                     tipo = entry_type
 
-                #table.add_row([symbol, tipo, price, size, position])
+                # table.add_row([symbol, tipo, price, size, position])
             except:
                 pass
-
-        print(data)
+        # Aca antes de devolver se puede mandar a una cola o algo
+        return (data)
 
         ## Broadcast JSON to WebSocket
-        #self.server_md.broadcast(str(data))
+        # self.server_md.broadcast(str(data))
 
     def secList(self):
         msg = fix50.SecurityListRequest()
@@ -372,10 +420,6 @@ class rofexEngine(fix.Application):
 
         mktSegmentID = self.getValue(message, fix.MarketSegmentID())
         noRelatedSym = self.getValue(message, fix.NoRelatedSym())
-        # print("Mkt Segment ID " + mktSegmentID + " tickers " + str(noRelatedSym))
-        # logfix.warning("Mkt Segment, Tickers>>(%s) " % mktSegmentID+ str(noRelatedSym))
-        # self.allData[mktSegmentID]=noRelatedSym
-        # print(self.allData)
 
         mktSegment = {}
         tickerData = {}
@@ -404,9 +448,7 @@ class rofexEngine(fix.Application):
         self.allSecurities[mktSegmentID] = mktSegment
         return self.allSecurities
 
-    """
-    Wrappers for get(Field)
-    """
+    # Wrappers for get(Field)
 
     def getValue(self, message, field):
         key = field
@@ -472,7 +514,6 @@ class rofexEngine(fix.Application):
             msg.addGroup(norelatedsym)
         fix.Session.sendToTarget(msg)
 
-
     def getTag35(self, message):
         return message.getHeader().getField(35)
 
@@ -518,12 +559,11 @@ class rofexEngine(fix.Application):
                 print(action)
                 # msg = msgToRofex.secList()
 
-
             elif action == '3':
                 print(self.allSecurities)
                 print(action)
             elif action == '4':
-                self.testRequest()
+                print(self.actualMarket)
                 print(action)
 
             elif action == '5':
@@ -534,13 +574,36 @@ class rofexEngine(fix.Application):
             #     print( self.sessionID.getSenderCompID() )
 
     def queryAction(self):
-        print("1) Suscribir MD\n2) SecList\n3) Print allSecuritiesList\n4) Test Request\n5) Quit")
+        print("1) Suscribir MD\n2) SecList\n3) Print allSecuritiesList\n4) Actual Market\n5) Quit")
         action = input("Action: ")
         return action
 
-    def goRobot(self, ticker, entries):
+    #def goRobot(self, ticker, entries):
+    def goRobot2(self):
 
         logfix.info("goRobot: >> (%s)" % self.sessionID)
         self.session_off = False
 
-        self.suscribeMD(ticker, entries)
+        #self.suscribeMD(ticker, entries)
+
+        keys = self.actualMarket.keys()
+
+        for k in keys:
+            bidPrice = self.getBidPx(self.actualMarket[k])
+            bidSize = self.getBidSize(self.actualMarket[k])
+            offerPrice = self.getOfferPx(self.actualMarket[k])
+            offerSize = self.getOfferSize(self.actualMarket[k])
+            print(k + "-->" + str(bidPrice) + " / " + str(offerPrice) + "   " + str(bidSize) + " / " + str(offerSize))
+
+            if len(self.actualMarket) == 2:
+                bidRF = self.getBidPx(self.actualMarket['RFX20Dic20'])
+                offRF = self.getOfferPx(self.actualMarket['RFX20Dic20'])
+                bidDO = self.getBidPx(self.actualMarket['DODic20'])
+                offDO = self.getOfferPx(self.actualMarket['DODic20'])
+
+                if bidDO != 0 and offDO != 0:
+                    # print("RFX20Dic20 en USD: " + str(bidRF / offDO)+ " / " + str(offRF/bidDO))
+                    print(
+                        "*RFX20Dic20 en USD: " + "{:.2f}".format(bidRF / offDO) + " / " + "{:.2f}".format(offRF / bidDO))
+
+
