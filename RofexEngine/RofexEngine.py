@@ -544,7 +544,8 @@ class rofexEngine(fix.Application):
         return self.msg
 
     def run(self):
-
+        
+        print("Paso x run")
         while 1:
             # time.sleep(2)
             action = self.queryAction()
@@ -577,6 +578,9 @@ class rofexEngine(fix.Application):
         print("1) Suscribir MD\n2) SecList\n3) Print allSecuritiesList\n4) Actual Market\n5) Quit")
         action = input("Action: ")
         return action
+
+    def printAllSecurities(self):
+        print(self.allSecurities)
 
     #def goRobot(self, ticker, entries):
     def goRobot2(self):

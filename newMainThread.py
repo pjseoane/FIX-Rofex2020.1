@@ -40,10 +40,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='FIX Client')
     parser.add_argument('file_name', type=str, help='Name of configuration file')
     args = parser.parse_args()
+
     market = input('Market (i.e. ROFX, BYMA): ')
     user = input('Username (SenderCompID): ')
     passwd = getpass(prompt="Password: ")
     account = input('Cuenta: ')
+
+
     fixMain = main(args.file_name, market, user, passwd, account)
 
     fixMain.daemon = True
