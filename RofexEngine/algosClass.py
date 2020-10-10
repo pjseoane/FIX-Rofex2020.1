@@ -14,7 +14,7 @@ class algos:
             bidSize = self.getBidSize(actual)
             offerPrice = self.getOfferPx(actual)
             offerSize = self.getOfferSize(actual)
-            print(k + "-->" + str(bidPrice) + " / " + str(offerPrice) + "   " + str(bidSize) + " / " + str(offerSize))
+            print(k + "-->  " + str(bidPrice) + " / " + str(offerPrice) + "   " + str(bidSize) + " / " + str(offerSize))
 
             if len(self.actualMarket) == 2:
                 bidRF = self.getBidPx(self.actualMarket['RFX20Dic20'])
@@ -27,6 +27,11 @@ class algos:
                     print(
                         "*RFX20Dic20 en USD: " + "{:.2f}".format(bidRF / offDO) + " / " + "{:.2f}".format(
                             offRF / bidDO))
+
+    ### msg parser
+    @staticmethod
+    def getTicker(msg):
+        return msg['instrumentId']['symbol']
 
     @staticmethod
     def getBidPx(msg):

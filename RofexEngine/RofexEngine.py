@@ -158,16 +158,14 @@ class rofexEngine(fix.Application):
         elif tag35 == 'W':  # MktData
             # print(self.getValue(message, fix.Symbol()))
             logfix.warning("MD <-- fromApp >> (%s) " % msg)
-            # self.onMessage_MarketDataSnapshotFullRefresh(message)
+            #self.onMessage_MarketDataSnapshotFullRefresh(message)
             self.onMessage_MarketDataSnapshotFullRefreshToDict(message)
             self.goRobot()
 
         else:
             logfix.warning("Response <-- fromApp >> (%s) " % msg)
 
-    ### msg parser
-    def getTicker(self, msg):
-        return msg['instrumentId']['symbol']
+
 
 
 
@@ -266,9 +264,9 @@ class rofexEngine(fix.Application):
 
     def onMessage_MarketDataSnapshotFullRefreshToDict(self, message):
         # cada vez que entra un mensaje se procesa y se carga en el dict
-        mDict = (self.onMessage_MarketDataSnapshotFullRefresh(message))
-        self.actualMarket[self.getTicker(mDict)] = mDict
-        # print(mDict)
+        mensaje = (self.onMessage_MarketDataSnapshotFullRefresh(message))
+        self.actualMarket[mensaje['instrumentId']['symbol']]=mensaje
+
 
     def onMessage_MarketDataSnapshotFullRefresh(self, message):
         """
@@ -369,7 +367,8 @@ class rofexEngine(fix.Application):
             except:
                 pass
         # Aca antes de devolver se puede mandar a una cola o algo
-        return (data)
+        return data
+
 
         ## Broadcast JSON to WebSocket
         # self.server_md.broadcast(str(data))
