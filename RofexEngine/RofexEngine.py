@@ -7,23 +7,19 @@ import quickfix50sp2 as fix50
 import logging
 import texttable
 
-# from RofexEngine.bots import bots
+from RofexEngine.algosClass import algos
 
 logfix = logging.getLogger('FIX')  # 'FIX'
 from Logger.logger import setup_logger2
 
-
-setup_logger2('FIX', 'Logs/message.log', logging.DEBUG, logging.DEBUG)  # ,logging.DEBUG,logging.DEBUG)
-
-
-
+setup_logger2('FIX', 'Logs/message.log', logging.CRITICAL, logging.DEBUG)  # ,logging.DEBUG,logging.DEBUG)
 
 __SOH__ = chr(1)
 
 
 class rofexEngine(fix.Application):
-    def __init__(self, usr, pswd, targetCompId, tickers):
-    #def __init__(self, usr, pswd, targetCompId):
+    def __init__(self, usr, pswd, targetCompId, tickers,entries):
+        # def __init__(self, usr, pswd, targetCompId):
         super().__init__()
         self.sessionID = None
         self.session_off = True
@@ -34,14 +30,14 @@ class rofexEngine(fix.Application):
         self.password = pswd
         self.targetCompID = targetCompId
         self.tickers = tickers
+        self.entries=entries
 
         self.allSecurities = {}
         self.actualMarket = {}
-        # self.bot=bots(self.actualMarket)
+        self.algoTEST=algos(self.actualMarket)
 
-        # self.msgToRofex = armarMensajes(self.usrID, self.targetCompID,self.allSecurities)
         self.tag35 = None
-        # todo crear un diccionario que tenga el ultimo dato vio de un md
+
 
     def formatMsg(self, message):
         return message.toString().replace(__SOH__, "|")
@@ -62,8 +58,8 @@ class rofexEngine(fix.Application):
         logfix.critical("Logged OK, sessionID >> (%s)" % self.sessionID)
 
         self.secList()
-
-        self.suscribeMD(self.tickers, ['0', '1', '2', '4', '5', '6', '7', '8', 'B', 'C'])
+        self.suscribeMD(self.tickers, self.entries)
+        #self.suscribeMD(self.tickers, ['0', '1', '2', '4', '5', '6', '7', '8', 'B', 'C'])
 
         logfix.critical("onLogon, securitiesList Requested..., sessionID >> (%s)" % self.sessionID)
 
@@ -164,8 +160,7 @@ class rofexEngine(fix.Application):
             logfix.warning("MD <-- fromApp >> (%s) " % msg)
             # self.onMessage_MarketDataSnapshotFullRefresh(message)
             self.onMessage_MarketDataSnapshotFullRefreshToDict(message)
-            self.goRobot2()
-
+            self.goRobot()
 
         else:
             logfix.warning("Response <-- fromApp >> (%s) " % msg)
@@ -174,37 +169,7 @@ class rofexEngine(fix.Application):
     def getTicker(self, msg):
         return msg['instrumentId']['symbol']
 
-    def getBidPx(self, msg):
-        if len((msg['marketData']['BI'])) > 0:
-            return msg['marketData']['BI'][0]['price']
-        else:
-            return 0
 
-    def getOfferPx(self, msg):
-        if len((msg['marketData']['OF'])) > 0:
-            return msg['marketData']['OF'][0]['price']
-        else:
-            return 0
-
-    def getBidSize(self, msg):
-        if len((msg['marketData']['BI'])) > 0:
-            return msg['marketData']['BI'][0]['size']
-        else:
-            return 0
-
-    def getOfferSize(self, msg):
-        if len((msg['marketData']['OF'])) > 0:
-            return msg['marketData']['OF'][0]['size']
-        else:
-            return 0
-
-    def getBidDictActualMkt(self, ticker):
-        return self.getBid(self.actualMarket[ticker])
-
-    def getBidSizeDictActualMkt(self, ticker):
-        return self.getBidSize(self.actualMarket[ticker])
-
-    ###
 
     def onMessage_MarketDataSnapshotFullRefreshTable(self, message):
         """
@@ -556,7 +521,7 @@ class rofexEngine(fix.Application):
             # time.sleep(2)
             action = self.queryAction()
             if action == '1':
-                self.goRobot(self.tickers, ['0', '1', '2', '4', '5', '6', '7', '8', 'B', 'C'])
+                # self.goRobot(self.tickers, ['0', '1', '2', '4', '5', '6', '7', '8', 'B', 'C'])
                 print(action)
                 # self.suscribeMD("RFX20Dic20")
                 # msg = rofexMsg(self.usrId).suscribeMD("RFX20Sep20")
@@ -585,40 +550,6 @@ class rofexEngine(fix.Application):
     def printAllSecurities(self):
         print(self.allSecurities)
 
-    # def goRobot(self, ticker, entries):
-    def goRobot2(self):
-        print("ROBOT2")
-        logfix.critical("goRobot: >> (%s)" % self.sessionID)
-        self.session_off = False
-
-        # self.suscribeMD(ticker, entries)
-
-        keys = self.actualMarket.keys()
-
-        for k in keys:
-            bidPrice = self.getBidPx(self.actualMarket[k])
-            bidSize = self.getBidSize(self.actualMarket[k])
-            offerPrice = self.getOfferPx(self.actualMarket[k])
-            offerSize = self.getOfferSize(self.actualMarket[k])
-            print(k + "-->" + str(bidPrice) + " / " + str(offerPrice) + "   " + str(bidSize) + " / " + str(offerSize))
-
-            if len(self.actualMarket) == 2:
-                bidRF = self.getBidPx(self.actualMarket['RFX20Dic20'])
-                offRF = self.getOfferPx(self.actualMarket['RFX20Dic20'])
-                bidDO = self.getBidPx(self.actualMarket['DODic20'])
-                offDO = self.getOfferPx(self.actualMarket['DODic20'])
-
-                if bidDO != 0 and offDO != 0:
-                    # print("RFX20Dic20 en USD: " + str(bidRF / offDO)+ " / " + str(offRF/bidDO))
-                    print(
-                        "*RFX20Dic20 en USD: " + "{:.2f}".format(bidRF / offDO) + " / " + "{:.2f}".format(
-                            offRF / bidDO))
-
-    def goRobot3(self):
-        print("Go Robot 3")
-
-    def goRobot4(self):
-        print("Go Robot 4")
-
-    def selectAlgo(self, algo):
-        return algo(self)
+    def goRobot(self):
+        # va a al fiel algosClass y ahi ejecuta lo que tenga bajo goRobot
+        self.algoTEST.goRobot()
