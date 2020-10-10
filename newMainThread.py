@@ -46,8 +46,8 @@ if __name__ == '__main__':
     passwd = getpass(prompt="Password: ")
     account = input('Cuenta: ')
 
-
     fixMain = main(args.file_name, market, user, passwd, account)
+
 
     fixMain.daemon = True
     fixMain.start()

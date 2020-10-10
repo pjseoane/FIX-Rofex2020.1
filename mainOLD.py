@@ -37,7 +37,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     suscribeTuple = ['RFX20Dic20', 'DODic20']
-    # mainLogon(args.file_name, 'pjseoane232', 'AiZkiC5#', 'ROFX', suscribeTuple)
 
     mainLogon(args.file_name, 'pjseoane232', 'AiZkiC5#', 'ROFX', suscribeTuple)
 

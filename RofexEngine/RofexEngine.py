@@ -585,7 +585,7 @@ class rofexEngine(fix.Application):
     #def goRobot(self, ticker, entries):
     def goRobot2(self):
 
-        logfix.info("goRobot: >> (%s)" % self.sessionID)
+        logfix.critical("goRobot: >> (%s)" % self.sessionID)
         self.session_off = False
 
         #self.suscribeMD(ticker, entries)
