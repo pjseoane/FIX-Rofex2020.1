@@ -544,7 +544,8 @@ class rofexEngine(fix.Application):
         return self.msg
 
     def run(self):
-
+        
+        print("Paso x run")
         while 1:
             # time.sleep(2)
             action = self.queryAction()
@@ -578,10 +579,13 @@ class rofexEngine(fix.Application):
         action = input("Action: ")
         return action
 
+    def printAllSecurities(self):
+        print(self.allSecurities)
+
     #def goRobot(self, ticker, entries):
     def goRobot2(self):
 
-        logfix.info("goRobot: >> (%s)" % self.sessionID)
+        logfix.critical("goRobot: >> (%s)" % self.sessionID)
         self.session_off = False
 
         #self.suscribeMD(ticker, entries)
