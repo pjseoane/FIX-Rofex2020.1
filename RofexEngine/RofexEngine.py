@@ -8,6 +8,8 @@ import logging
 import texttable
 
 from RofexEngine.algosClass import algos
+#from RofexEngine.testRun import algo2
+
 
 logfix = logging.getLogger('FIX')  # 'FIX'
 from Logger.logger import setup_logger2
@@ -18,7 +20,7 @@ __SOH__ = chr(1)
 
 
 class rofexEngine(fix.Application):
-    def __init__(self, usr, pswd, targetCompId, tickers,entries):
+    def __init__(self, usr, pswd, targetCompId, tickers, entries):
         # def __init__(self, usr, pswd, targetCompId):
         super().__init__()
         self.sessionID = None
@@ -30,14 +32,15 @@ class rofexEngine(fix.Application):
         self.password = pswd
         self.targetCompID = targetCompId
         self.tickers = tickers
-        self.entries=entries
+        self.entries = entries
 
         self.allSecurities = {}
         self.actualMarket = {}
-        self.algoTEST=algos(self.actualMarket)
+        self.lastMsg=None
+        self.algoTEST = algos(self.actualMarket,tickers) # crea el objeto algos con el diccionario de datos de las cotiz actuales
+        #self.algoTest2 = algo2(self.actualMarket)
 
         self.tag35 = None
-
 
     def formatMsg(self, message):
         return message.toString().replace(__SOH__, "|")
@@ -57,9 +60,9 @@ class rofexEngine(fix.Application):
         self.session_off = False
         logfix.critical("Logged OK, sessionID >> (%s)" % self.sessionID)
 
-        self.secList()
-        self.suscribeMD(self.tickers, self.entries)
-        #self.suscribeMD(self.tickers, ['0', '1', '2', '4', '5', '6', '7', '8', 'B', 'C'])
+        self.getSecuritiesList()
+        #self.suscribeMD(self.tickers, self.entries)
+
 
         logfix.critical("onLogon, securitiesList Requested..., sessionID >> (%s)" % self.sessionID)
 
@@ -158,16 +161,12 @@ class rofexEngine(fix.Application):
         elif tag35 == 'W':  # MktData
             # print(self.getValue(message, fix.Symbol()))
             logfix.warning("MD <-- fromApp >> (%s) " % msg)
-            #self.onMessage_MarketDataSnapshotFullRefresh(message)
-            self.onMessage_MarketDataSnapshotFullRefreshToDict(message)
+            self.lastMsg = self.onMessage_MarketDataSnapshotFullRefresh(message)
+
             self.goRobot()
 
         else:
             logfix.warning("Response <-- fromApp >> (%s) " % msg)
-
-
-
-
 
     def onMessage_MarketDataSnapshotFullRefreshTable(self, message):
         """
@@ -262,11 +261,10 @@ class rofexEngine(fix.Application):
 
         ## Broadcast JSON to WebSocket
 
-    def onMessage_MarketDataSnapshotFullRefreshToDict(self, message):
+    def onMessage_MarketDataSnapshotFullRefreshToDict(self):
         # cada vez que entra un mensaje se procesa y se carga en el dict
-        mensaje = (self.onMessage_MarketDataSnapshotFullRefresh(message))
-        self.actualMarket[mensaje['instrumentId']['symbol']]=mensaje
-
+        #mensaje = (self.onMessage_MarketDataSnapshotFullRefresh(message))
+        self.actualMarket[self.lastMsg['instrumentId']['symbol']] = self.lastMsg
 
     def onMessage_MarketDataSnapshotFullRefresh(self, message):
         """
@@ -369,11 +367,10 @@ class rofexEngine(fix.Application):
         # Aca antes de devolver se puede mandar a una cola o algo
         return data
 
-
         ## Broadcast JSON to WebSocket
         # self.server_md.broadcast(str(data))
 
-    def secList(self):
+    def getSecuritiesList(self):
         msg = fix50.SecurityListRequest()
         header = msg.getHeader()
         header.setField(fix.SenderCompID(self.usrID))
@@ -382,6 +379,7 @@ class rofexEngine(fix.Application):
         msg.setField(fix.SecurityListRequestType(4))
 
         fix.Session.sendToTarget(msg)
+
 
     def onMessage_SecurityList(self, message):
         group = fix50.SecurityList().NoRelatedSym()
@@ -551,4 +549,6 @@ class rofexEngine(fix.Application):
 
     def goRobot(self):
         # va a al fiel algosClass y ahi ejecuta lo que tenga bajo goRobot
+        #self.onMessage_MarketDataSnapshotFullRefreshToDict()
+        self.algoTEST.addMsgToDict(self.lastMsg)
         self.algoTEST.goRobot()

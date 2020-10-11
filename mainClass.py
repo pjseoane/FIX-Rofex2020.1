@@ -42,6 +42,38 @@ class main:
             self.initiator.stop()
             sys.exit()
 
+    def run(self):
+        print("Paso x run")
+
+        while 1:
+            # time.sleep(2)
+            action = self.queryAction()
+            if action == '1':
+                print(action)
+                self.myFixApplication.suscribeMD(self.tickers, self.entries)
+
+            elif action == '2':
+                print(action)
+                # msg = msgToRofex.secList()
+
+            elif action == '3':
+                self.myFixApplication.printAllSecurities()
+                print(action)
+            elif action == '4':
+                # print(self.actualMarket)
+                print(action)
+
+            elif action == '5':
+                print(action)
+                break
+
+        fixMain.initiator.stop()
+
+    def queryAction(self):
+        print("1) Suscribir MD2\n2) SecList\n3) Print allSecuritiesList\n4) Actual Market\n5) Quit")
+        action = input("Action:\n")
+        return action
+
 
 if __name__ == '__main__':
     # rofexLogon('Initiator\configuration\primaryInitiator.cfg','pjseoane232','AiZkiC5#')
@@ -50,12 +82,11 @@ if __name__ == '__main__':
     parser.add_argument('file_name', type=str, help='Name of configuration file')
     args = parser.parse_args()
 
-    suscribeTuple = ['RFX20Dic20', 'DODic20', 'DOOct20']
+    suscribeTuple = ['RFX20Dic20', 'DODic20']
     entries = ['0', '1', '2', '4', '5', '6', '7', '8', 'B', 'C']
 
     fixMain = main(args.file_name, 'pjseoane232', 'AiZkiC5#', 'ROFX', suscribeTuple, entries)
 
     fixMain.initiator.start()
-    fixMain.myFixApplication.run()
-
-    fixMain.initiator.stop()
+    # fixMain.myFixApplication.run()
+    fixMain.run()
