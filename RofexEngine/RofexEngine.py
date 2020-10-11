@@ -6,22 +6,22 @@ import quickfix as fix
 import quickfix50sp2 as fix50
 import logging
 import texttable
-from RofexEngine import bots as bt
+
+from RofexEngine.algosClass import algos
+#from RofexEngine.testRun import algo2
+
 
 logfix = logging.getLogger('FIX')  # 'FIX'
 from Logger.logger import setup_logger2
 
-# from Logger.logger import setup_logger
 setup_logger2('FIX', 'Logs/message.log', logging.CRITICAL, logging.DEBUG)  # ,logging.DEBUG,logging.DEBUG)
-
-# setup_logger('FIX', 'Logs/message.log')
-
 
 __SOH__ = chr(1)
 
 
 class rofexEngine(fix.Application):
-    def __init__(self, usr, pswd, targetCompId, tickers):
+    def __init__(self, usr, pswd, targetCompId, tickers, entries):
+        # def __init__(self, usr, pswd, targetCompId):
         super().__init__()
         self.sessionID = None
         self.session_off = True
@@ -32,12 +32,15 @@ class rofexEngine(fix.Application):
         self.password = pswd
         self.targetCompID = targetCompId
         self.tickers = tickers
+        self.entries = entries
 
         self.allSecurities = {}
         self.actualMarket = {}
-        # self.msgToRofex = armarMensajes(self.usrID, self.targetCompID,self.allSecurities)
+        self.lastMsg=None
+        self.algoTEST = algos(self.actualMarket,tickers) # crea el objeto algos con el diccionario de datos de las cotiz actuales
+        #self.algoTest2 = algo2(self.actualMarket)
+
         self.tag35 = None
-        # todo crear un diccionario que tenga el ultimo dato vio de un md
 
     def formatMsg(self, message):
         return message.toString().replace(__SOH__, "|")
@@ -57,8 +60,9 @@ class rofexEngine(fix.Application):
         self.session_off = False
         logfix.critical("Logged OK, sessionID >> (%s)" % self.sessionID)
 
-        self.secList()
-        self.suscribeMD(self.tickers, ['0', '1', '2', '4', '5', '6', '7', '8', 'B', 'C'])
+        self.getSecuritiesList()
+        #self.suscribeMD(self.tickers, self.entries)
+
 
         logfix.critical("onLogon, securitiesList Requested..., sessionID >> (%s)" % self.sessionID)
 
@@ -157,48 +161,13 @@ class rofexEngine(fix.Application):
         elif tag35 == 'W':  # MktData
             # print(self.getValue(message, fix.Symbol()))
             logfix.warning("MD <-- fromApp >> (%s) " % msg)
-            # self.onMessage_MarketDataSnapshotFullRefresh(message)
-            self.onMessage_MarketDataSnapshotFullRefreshToDict(message)
-            self.goRobot2()
+            self.lastMsg = self.onMessage_MarketDataSnapshotFullRefresh(message)
+
+            self.goRobot()
 
         else:
             logfix.warning("Response <-- fromApp >> (%s) " % msg)
 
-    ### msg parser
-    def getTicker(self, msg):
-        return msg['instrumentId']['symbol']
-
-    def getBidPx(self, msg):
-        if len((msg['marketData']['BI'])) > 0:
-            return msg['marketData']['BI'][0]['price']
-        else:
-            return 0
-
-    def getOfferPx(self, msg):
-        if len((msg['marketData']['OF'])) > 0:
-            return msg['marketData']['OF'][0]['price']
-        else:
-            return 0
-
-    def getBidSize(self, msg):
-        if len((msg['marketData']['BI'])) > 0:
-            return msg['marketData']['BI'][0]['size']
-        else:
-            return 0
-
-    def getOfferSize(self, msg):
-        if len((msg['marketData']['OF'])) > 0:
-            return msg['marketData']['OF'][0]['size']
-        else:
-            return 0
-
-    def getBidDictActualMkt(self, ticker):
-        return self.getBid(self.actualMarket[ticker])
-
-    def getBidSizeDictActualMkt(self, ticker):
-        return self.getBidSize(self.actualMarket[ticker])
-
-    ###
     def onMessage_MarketDataSnapshotFullRefreshTable(self, message):
         """
         onMessage - Market Data - Snapshot / Full Refresh
@@ -292,13 +261,10 @@ class rofexEngine(fix.Application):
 
         ## Broadcast JSON to WebSocket
 
-    def onMessage_MarketDataSnapshotFullRefreshToDict(self, message):
-        #cada vez que entra un mensaje se procesa y se carga en el dict
-        mDict = (self.onMessage_MarketDataSnapshotFullRefresh(message))
-        self.actualMarket[self.getTicker(mDict)] = mDict
-        #print(mDict)
-
-
+    def onMessage_MarketDataSnapshotFullRefreshToDict(self):
+        # cada vez que entra un mensaje se procesa y se carga en el dict
+        #mensaje = (self.onMessage_MarketDataSnapshotFullRefresh(message))
+        self.actualMarket[self.lastMsg['instrumentId']['symbol']] = self.lastMsg
 
     def onMessage_MarketDataSnapshotFullRefresh(self, message):
         """
@@ -399,12 +365,12 @@ class rofexEngine(fix.Application):
             except:
                 pass
         # Aca antes de devolver se puede mandar a una cola o algo
-        return (data)
+        return data
 
         ## Broadcast JSON to WebSocket
         # self.server_md.broadcast(str(data))
 
-    def secList(self):
+    def getSecuritiesList(self):
         msg = fix50.SecurityListRequest()
         header = msg.getHeader()
         header.setField(fix.SenderCompID(self.usrID))
@@ -413,6 +379,7 @@ class rofexEngine(fix.Application):
         msg.setField(fix.SecurityListRequestType(4))
 
         fix.Session.sendToTarget(msg)
+
 
     def onMessage_SecurityList(self, message):
         group = fix50.SecurityList().NoRelatedSym()
@@ -481,7 +448,7 @@ class rofexEngine(fix.Application):
         return key.getValue()
 
     def suscribeMD(self, tickers, entries):
-
+        print("SUSCRIBE MD***************************************************************************")
         if len(tickers) == 0 or len(entries) == 0:
             return
 
@@ -544,13 +511,14 @@ class rofexEngine(fix.Application):
         return self.msg
 
     def run(self):
-        
+
         print("Paso x run")
+
         while 1:
             # time.sleep(2)
             action = self.queryAction()
             if action == '1':
-                self.goRobot(self.tickers, ['0', '1', '2', '4', '5', '6', '7', '8', 'B', 'C'])
+                # self.goRobot(self.tickers, ['0', '1', '2', '4', '5', '6', '7', '8', 'B', 'C'])
                 print(action)
                 # self.suscribeMD("RFX20Dic20")
                 # msg = rofexMsg(self.usrId).suscribeMD("RFX20Sep20")
@@ -571,9 +539,6 @@ class rofexEngine(fix.Application):
                 print(action)
                 break
 
-            # elif action == '6':
-            #     print( self.sessionID.getSenderCompID() )
-
     def queryAction(self):
         print("1) Suscribir MD\n2) SecList\n3) Print allSecuritiesList\n4) Actual Market\n5) Quit")
         action = input("Action: ")
@@ -582,32 +547,8 @@ class rofexEngine(fix.Application):
     def printAllSecurities(self):
         print(self.allSecurities)
 
-    #def goRobot(self, ticker, entries):
-    def goRobot2(self):
-
-        logfix.critical("goRobot: >> (%s)" % self.sessionID)
-        self.session_off = False
-
-        #self.suscribeMD(ticker, entries)
-
-        keys = self.actualMarket.keys()
-
-        for k in keys:
-            bidPrice = self.getBidPx(self.actualMarket[k])
-            bidSize = self.getBidSize(self.actualMarket[k])
-            offerPrice = self.getOfferPx(self.actualMarket[k])
-            offerSize = self.getOfferSize(self.actualMarket[k])
-            print(k + "-->" + str(bidPrice) + " / " + str(offerPrice) + "   " + str(bidSize) + " / " + str(offerSize))
-
-            if len(self.actualMarket) == 2:
-                bidRF = self.getBidPx(self.actualMarket['RFX20Dic20'])
-                offRF = self.getOfferPx(self.actualMarket['RFX20Dic20'])
-                bidDO = self.getBidPx(self.actualMarket['DODic20'])
-                offDO = self.getOfferPx(self.actualMarket['DODic20'])
-
-                if bidDO != 0 and offDO != 0:
-                    # print("RFX20Dic20 en USD: " + str(bidRF / offDO)+ " / " + str(offRF/bidDO))
-                    print(
-                        "*RFX20Dic20 en USD: " + "{:.2f}".format(bidRF / offDO) + " / " + "{:.2f}".format(offRF / bidDO))
-
-
+    def goRobot(self):
+        # va a al fiel algosClass y ahi ejecuta lo que tenga bajo goRobot
+        #self.onMessage_MarketDataSnapshotFullRefreshToDict()
+        self.algoTEST.addMsgToDict(self.lastMsg)
+        self.algoTEST.goRobot()
