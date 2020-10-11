@@ -23,7 +23,6 @@ class main:
         try:
             self.settings = fix.SessionSettings(self.config_file)
             self.myFixApplication = rofexEngine(self.usrId, self.pswd, self.targetCompID, self.tickers, self.entries)
-            # self.myFixApplication = rofexEngine(self.usrId, self.pswd, self.targetCompID)
             self.storefactory = fix.FileStoreFactory(self.settings)
             self.logfactory = fix.FileLogFactory(self.settings)
             self.initiator = fix.SocketInitiator(self.myFixApplication, self.storefactory, self.settings,
@@ -50,7 +49,7 @@ class main:
             action = self.queryAction()
             if action == '1':
                 print(action)
-                self.myFixApplication.suscribeMD(self.tickers, self.entries)
+                self.myFixApplication.suscribeMD()
 
             elif action == '2':
                 print(action)

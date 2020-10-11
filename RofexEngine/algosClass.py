@@ -24,12 +24,14 @@ class algos:
 
         keys = self.actualMarket.keys()
 
+        print('-------------------------------------------------')
         for k in keys:
             actual=self.actualMarket[k]
             bidPrice = self.getBidPx(actual)
             bidSize = self.getBidSize(actual)
             offerPrice = self.getOfferPx(actual)
             offerSize = self.getOfferSize(actual)
+
             print(k + "--->  " + str(bidPrice) + " / " + str(offerPrice) + "   " + str(bidSize) + " / " + str(offerSize))
 
             if len(self.actualMarket) == 2:
