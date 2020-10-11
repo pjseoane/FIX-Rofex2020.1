@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 # coding: utf-8
-
+from typing import Dict, Any
 
 import quickfix as fix
 import quickfix50sp2 as fix50
 import logging
-import texttable
 
+from RofexEngine.onMessage import onMessage
 from RofexEngine.algosClass import algos
-#from RofexEngine.testRun import algo2
+
+# from RofexEngine.testRun import algo2
 
 
 logfix = logging.getLogger('FIX')  # 'FIX'
@@ -20,12 +21,14 @@ __SOH__ = chr(1)
 
 
 class rofexEngine(fix.Application):
+    allSecurities: Dict[Any, Any]
+
     def __init__(self, usr, pswd, targetCompId, tickers, entries):
         # def __init__(self, usr, pswd, targetCompId):
         super().__init__()
         self.sessionID = None
         self.session_off = True
-        self.contractList = None
+        # self.contractList = None
         self.secStatus = "secStatus"
 
         self.usrID = usr
@@ -36,9 +39,9 @@ class rofexEngine(fix.Application):
 
         self.allSecurities = {}
         self.actualMarket = {}
-        self.lastMsg=None
-        self.algoTEST = algos(self.actualMarket,tickers) # crea el objeto algos con el diccionario de datos de las cotiz actuales
-        #self.algoTest2 = algo2(self.actualMarket)
+        self.lastMsg = None
+        self.algoTEST = algos(self.actualMarket,
+                              tickers)  # crea el objeto algos con el diccionario de datos de las cotiz actuales
 
         self.tag35 = None
 
@@ -61,8 +64,7 @@ class rofexEngine(fix.Application):
         logfix.critical("Logged OK, sessionID >> (%s)" % self.sessionID)
 
         self.getSecuritiesList()
-        #self.suscribeMD(self.tickers, self.entries)
-
+        # self.suscribeMD(self.tickers, self.entries)
 
         logfix.critical("onLogon, securitiesList Requested..., sessionID >> (%s)" % self.sessionID)
 
@@ -125,9 +127,9 @@ class rofexEngine(fix.Application):
         # the message. If it is set to false, the message will simply not be sent. Notice that the FIX::Message is
         # not const. This allows you to add fields to an application message before it is sent out.
         msg = self.formatMsg(message)
-        tag35 = self.getTag35(message)
+        #tag35 = self.getTag35(message)
 
-        if tag35 == 'j':  # Business Message Reject
+        if self.getTag35(message) == 'j':  # Business Message Reject
             logfix.warning("toApp -> Reject >> (%s)" % msg)
         else:
             logfix.warning("toApp -> >> (%s)" % msg)
@@ -152,8 +154,11 @@ class rofexEngine(fix.Application):
             logfix.info("Trading Session Status <-- fromApp >> (%s) " % msg)
 
         elif tag35 == 'y':  # Security List
-            self.allSecurities = self.onMessage_SecurityList(message)
-            # self.allSecurities=msgProcessing.onMessage_SecurityListTEST(message, self.allSecurities)
+
+            securities = onMessage(message).onMessage_SecurityList()
+            keys = securities.keys()
+            for k in keys:
+                self.allSecurities[k] = securities
 
             logfix.info("Securities List: allSecurities{} <-- fromApp >> (%s) " % msg)
             # print(self.allSecurities)
@@ -161,214 +166,18 @@ class rofexEngine(fix.Application):
         elif tag35 == 'W':  # MktData
             # print(self.getValue(message, fix.Symbol()))
             logfix.warning("MD <-- fromApp >> (%s) " % msg)
-            self.lastMsg = self.onMessage_MarketDataSnapshotFullRefresh(message)
+
+            self.lastMsg = onMessage(message).onMessage_MarketDataSnapshotFullRefresh()
 
             self.goRobot()
 
         else:
             logfix.warning("Response <-- fromApp >> (%s) " % msg)
 
-    def onMessage_MarketDataSnapshotFullRefreshTable(self, message):
-        """
-        onMessage - Market Data - Snapshot / Full Refresh
 
-        Message Type = 'W'.
-        The Market Data Snapshot/Full Refresh messages are sent as the response to a Market Data Request
-        message. The message refers to only one Market Data Request. It will contain the appropiate MDReqID
-        tag value to correlate the request with the response.
-
-        Fields:
-            - (35) MsgType = W
-            - (262) MDReqID = (string)
-            - Block Instrument:
-                - (55) Symbol = (string - Ticker)
-            - Block MDfullGrp:
-                - (268) NoMDEntries = (Int - number of Entries)
-                    - (269) MDEntryType = 0 (Bid) / 1 (Offer) / 2 (Trade) / 4 (Opening price) / 5 (Closing Price) / 6 (Settlement Price) /
-                                            7 (Trading Session High Price) / 8 (Trading Session Low Price) / B (Trade Volume) / C (Open Interest) /
-                                            x (Nominal Volume) / w (Cash Volume)
-                    - (270) MDEntryPx = (float - Conditional field when MDEntryType is 0-1-2-4-5-6-7-8-w)
-                    - (271) MDEntrySize = (int - Conditional field when MDEntryType is 0-1-2-B-C-x)
-                    - (290) MDEntryPositionNo = (int)
-        """
-
-        # msg = message.toString().replace(__SOH__, "|")
-        # logfix.info("onMessage, R app (%s)" % msg)
-
-        data = {}
-
-        ## Number of entries following (Bid, Offer, etc)
-        noMDEntries = self.getValue(message, fix.NoMDEntries())
-
-        symbol = self.getValue(message, fix.Symbol())
-
-        ## Market ID (ROFX, BYMA)
-        marketId = self.getValue(message, fix.SecurityExchange())
-
-        instrumentId = {"symbol": symbol, "marketId": marketId}
-        data["instrumentId"] = instrumentId
-        data["marketData"] = {"BI": [], "OF": []}
-
-        group = fix50.MarketDataSnapshotFullRefresh().NoMDEntries()
-
-        MDEntryType = fix.MDEntryType()  # Identifies the type of entry (Bid, Offer, etc)
-        MDEntryPx = fix.MDEntryPx()
-        MDEntrySize = fix.MDEntrySize()
-        MDEntryPositionNo = fix.MDEntryPositionNo()  # Display position of a bid or offer, numbered from most competitive to least competitive
-
-        table = texttable.Texttable()
-        table.set_deco(texttable.Texttable.BORDER | texttable.Texttable.HEADER)
-        table.header(['Ticker', 'Tipo', 'Precio', 'Size', 'Posicion'])
-        table.set_cols_width([12, 20, 8, 8, 8])
-        table.set_cols_align(['c', 'c', 'c', 'c', 'c'])
-
-        for entry in range(1, int(noMDEntries) + 1):
-            try:
-
-                md = {}
-                price, size, position = None, None, None
-
-                message.getGroup(entry, group)
-                entry_type = group.getField(MDEntryType).getString()
-
-                if entry_type in list('01245678w'):
-                    price = group.getField(MDEntryPx).getString()
-                    md['price'] = float(price)
-                if entry_type in list('012BCx'):
-                    size = group.getField(MDEntrySize).getString()
-                    md['size'] = int(size)
-                if entry_type in list('01'):
-                    position = group.getField(MDEntryPositionNo).getString()
-                    md['position'] = int(position)
-
-                if entry_type == '0':
-                    data["marketData"]["BI"].append(md)
-                    tipo = 'BID'
-                elif entry_type == '1':
-                    data["marketData"]["OF"].append(md)
-                    tipo = 'OFFER'
-                elif entry_type == 'B':
-                    data["marketData"]["TV"] = md
-                    tipo = 'TRADE VOLUME'
-                else:
-                    tipo = entry_type
-
-                table.add_row([symbol, tipo, price, size, position])
-            except:
-                pass
-
-        print(table.draw())
 
         ## Broadcast JSON to WebSocket
 
-    def onMessage_MarketDataSnapshotFullRefreshToDict(self):
-        # cada vez que entra un mensaje se procesa y se carga en el dict
-        #mensaje = (self.onMessage_MarketDataSnapshotFullRefresh(message))
-        self.actualMarket[self.lastMsg['instrumentId']['symbol']] = self.lastMsg
-
-    def onMessage_MarketDataSnapshotFullRefresh(self, message):
-        """
-        onMessage - Market Data - Snapshot / Full Refresh
-
-        Message Type = 'W'.
-        The Market Data Snapshot/Full Refresh messages are sent as the response to a Market Data Request
-        message. The message refers to only one Market Data Request. It will contain the appropiate MDReqID
-        tag value to correlate the request with the response.
-
-        Fields:
-            - (35) MsgType = W
-            - (262) MDReqID = (string)
-            - Block Instrument:
-                - (55) Symbol = (string - Ticker)
-            - Block MDfullGrp:
-                - (268) NoMDEntries = (Int - number of Entries)
-                    - (269) MDEntryType = 0 (Bid) / 1 (Offer) / 2 (Trade) / 4 (Opening price) / 5 (Closing Price) / 6 (Settlement Price) /
-                                            7 (Trading Session High Price) / 8 (Trading Session Low Price) / B (Trade Volume) / C (Open Interest) /
-                                            x (Nominal Volume) / w (Cash Volume)
-                    - (270) MDEntryPx = (float - Conditional field when MDEntryType is 0-1-2-4-5-6-7-8-w)
-                    - (271) MDEntrySize = (int - Conditional field when MDEntryType is 0-1-2-B-C-x)
-                    - (290) MDEntryPositionNo = (int)
-        """
-
-        # msg = message.toString().replace(__SOH__, "|")
-        # logfix.info("onMessage, R app (%s)" % msg)
-
-        data = {}
-
-        ## Number of entries following (Bid, Offer, etc)
-        noMDEntries = self.getValue(message, fix.NoMDEntries())
-
-        symbol = self.getValue(message, fix.Symbol())
-
-        ## Market ID (ROFX, BYMA)
-        marketId = self.getValue(message, fix.SecurityExchange())
-
-        instrumentId = {"symbol": symbol, "marketId": marketId}
-        data["instrumentId"] = instrumentId
-        data["marketData"] = {"BI": [], "OF": []}
-
-        group = fix50.MarketDataSnapshotFullRefresh().NoMDEntries()
-
-        MDEntryType = fix.MDEntryType()  # Identifies the type of entry (Bid, Offer, etc)
-        MDEntryPx = fix.MDEntryPx()
-        MDEntrySize = fix.MDEntrySize()
-        MDEntryPositionNo = fix.MDEntryPositionNo()  # Display position of a bid or offer, numbered from most competitive to least competitive
-
-        """
-        table = texttable.Texttable()
-        table.set_deco(texttable.Texttable.BORDER|texttable.Texttable.HEADER)
-        table.header(['Ticker','Tipo','Precio','Size','Posicion'])
-        table.set_cols_width([12,20,8,8,8])
-        table.set_cols_align(['c','c','c','c','c'])
-        """
-
-        for entry in range(1, int(noMDEntries) + 1):
-            try:
-
-                md = {}
-                price, size, position = None, None, None
-
-                message.getGroup(entry, group)
-                entry_type = group.getField(MDEntryType).getString()
-
-                if entry_type in list('01245678w'):
-                    # campos que tienen precio
-                    price = group.getField(MDEntryPx).getString()
-                    md['price'] = float(price)
-
-                if entry_type in list('012BCx'):
-                    # campos que tienen size
-                    size = group.getField(MDEntrySize).getString()
-                    md['size'] = int(size)
-
-                if entry_type in list('01'):
-                    # campos que tienen orden
-                    position = group.getField(MDEntryPositionNo).getString()
-                    md['position'] = int(position)
-
-                if entry_type == '0':
-                    data["marketData"]["BI"].append(md)
-                    tipo = 'BID'
-
-                elif entry_type == '1':
-                    data["marketData"]["OF"].append(md)
-                    tipo = 'OFFER'
-
-                elif entry_type == 'B':
-                    data["marketData"]["TV"] = md
-                    tipo = 'TRADE VOLUME'
-
-                else:
-                    tipo = entry_type
-
-                # table.add_row([symbol, tipo, price, size, position])
-            except:
-                pass
-        # Aca antes de devolver se puede mandar a una cola o algo
-        return data
-
-        ## Broadcast JSON to WebSocket
-        # self.server_md.broadcast(str(data))
 
     def getSecuritiesList(self):
         msg = fix50.SecurityListRequest()
@@ -380,80 +189,13 @@ class rofexEngine(fix.Application):
 
         fix.Session.sendToTarget(msg)
 
-
-    def onMessage_SecurityList(self, message):
-        group = fix50.SecurityList().NoRelatedSym()
-        # print(group)
-
-        mktSegmentID = self.getValue(message, fix.MarketSegmentID())
-        noRelatedSym = self.getValue(message, fix.NoRelatedSym())
-
-        mktSegment = {}
-        tickerData = {}
-
-        for tickers in range(1, noRelatedSym + 1):
-            message.getGroup(tickers, group)
-            aux = {'symbol': self.getValueGroup(group, fix.Symbol()),
-                   'factor': self.getValueGroup(group, fix.Factor()),
-                   'securityDesc': self.getValueGroup(group, fix.SecurityDesc()),
-                   'cfiCode': self.getValueGroup(group, fix.CFICode()),
-                   'contractMultiplier': self.getValueGroup(group, fix.ContractMultiplier()),
-                   'minPriceIncrement': self.getValueGroup(group, fix.MinPriceIncrement()),
-                   'tickSize': group.getField(5023),
-                   'instrumentPricePrecision': group.getField(5514),
-                   'instrumentSizePrecision': group.getField(7117),
-                   'currency': self.getValueGroup(group, fix.Currency()),
-                   'maxTradeVol': self.getValueGroup(group, fix.MaxTradeVol()),
-                   'minTradeVol': self.getValueGroup(group, fix.MinTradeVol()),
-                   'lowLimitPrice': self.getValueGroup(group, fix.LowLimitPrice()),
-                   'highLimitPrice': self.getValueGroup(group, fix.HighLimitPrice())
-                   }
-            tickerData[self.getValueGroup(group, fix.Symbol())] = aux
-        mktSegment[mktSegmentID] = tickerData
-
-        # para unir todos los diccionarios en 1
-        self.allSecurities[mktSegmentID] = mktSegment
-        return self.allSecurities
-
-    # Wrappers for get(Field)
-
-    def getValue(self, message, field):
-        key = field
-        message.getField(key)
-        return key.getValue()
-
-    def getString(self, message, field):
-        key = field
-        message.getField(key)
-        return key.getString()
-
-    def getHeaderValue(self, message, field):
-        key = field
-        message.getHeader().getField(key)
-        return key.getValue()
-
-    def getFooterValue(self, message, field):
-        key = field
-        message.getTrailer().getField(key)
-        return key.getValue()
-
-    def getStringGroup(self, group, field):
-        key = field
-        group.getField(key)
-        return key.getString()
-
-    def getValueGroup(self, group, field):
-        key = field
-        group.getField(key)
-        return key.getValue()
-
-    def suscribeMD(self, tickers, entries):
+    def suscribeMD(self):
         print("SUSCRIBE MD***************************************************************************")
-        if len(tickers) == 0 or len(entries) == 0:
+        if len(self.tickers) == 0 or len(self.entries) == 0:
             return
 
         allowed_entries = ['0', '1', '2', '4', '5', '6', '7', '8', 'B', 'C']
-        if not all(elem in allowed_entries for elem in entries):
+        if not all(elem in allowed_entries for elem in self.entries):
             return
 
         msg = fix50.MarketDataRequest()
@@ -469,13 +211,13 @@ class rofexEngine(fix.Application):
 
         # BlockMDReqGrp
         group = fix50.MarketDataRequest().NoMDEntryTypes()
-        for field in entries:
+        for field in self.entries:
             group.setField(fix.MDEntryType(str(field)))
             msg.addGroup(group)
 
         # Symbols
         norelatedsym = fix50.MarketDataRequest().NoRelatedSym()
-        for ticker in tickers:
+        for ticker in self.tickers:
             norelatedsym.setField(fix.Symbol(ticker))
             logfix.warning("--> Suscribe Ticker >> (%s)" % ticker)
             msg.addGroup(norelatedsym)
@@ -510,45 +252,16 @@ class rofexEngine(fix.Application):
         header.setField(fix.TargetCompID(self.targetCompID))
         return self.msg
 
+    """
     def run(self):
 
-        print("Paso x run")
-
-        while 1:
-            # time.sleep(2)
-            action = self.queryAction()
-            if action == '1':
-                # self.goRobot(self.tickers, ['0', '1', '2', '4', '5', '6', '7', '8', 'B', 'C'])
-                print(action)
-                # self.suscribeMD("RFX20Dic20")
-                # msg = rofexMsg(self.usrId).suscribeMD("RFX20Sep20")
-
-
-            elif action == '2':
-                print(action)
-                # msg = msgToRofex.secList()
-
-            elif action == '3':
-                print(self.allSecurities)
-                print(action)
-            elif action == '4':
-                print(self.actualMarket)
-                print(action)
-
-            elif action == '5':
-                print(action)
-                break
-
-    def queryAction(self):
-        print("1) Suscribir MD\n2) SecList\n3) Print allSecuritiesList\n4) Actual Market\n5) Quit")
-        action = input("Action: ")
-        return action
+    """
 
     def printAllSecurities(self):
         print(self.allSecurities)
 
     def goRobot(self):
         # va a al fiel algosClass y ahi ejecuta lo que tenga bajo goRobot
-        #self.onMessage_MarketDataSnapshotFullRefreshToDict()
+        # self.onMessage_MarketDataSnapshotFullRefreshToDict()
         self.algoTEST.addMsgToDict(self.lastMsg)
         self.algoTEST.goRobot()
