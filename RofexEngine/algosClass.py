@@ -1,11 +1,27 @@
 class algos:
-    def __init__(self, actualMarket):
+    def __init__(self, actualMarket, tickers):
         self.actualMarket = actualMarket
+        self.tickers=tickers
 
     def goRobot(self):
-        self.printMktDict()
+        #print(self.actualMarket)
+        self.ratio2Tickers()
 
-    def printMktDict(self):
+    def addMsgToDict(self, lastMsg):
+        self.actualMarket[lastMsg['instrumentId']['symbol']] = lastMsg
+        #self.printFormatedMsg(lastMsg)
+
+    def printFormatedMsg(self,last):
+        actual=last
+        ticker=self.getTicker(actual)
+        bidPrice = self.getBidPx(actual)
+        bidSize = self.getBidSize(actual)
+        offerPrice = self.getOfferPx(actual)
+        offerSize = self.getOfferSize(actual)
+        print(ticker + "line-->  " + str(bidPrice) + " / " + str(offerPrice) + "   " + str(bidSize) + " / " + str(offerSize))
+
+    def ratio2Tickers(self):
+
         keys = self.actualMarket.keys()
 
         for k in keys:
@@ -14,19 +30,22 @@ class algos:
             bidSize = self.getBidSize(actual)
             offerPrice = self.getOfferPx(actual)
             offerSize = self.getOfferSize(actual)
-            print(k + "-->  " + str(bidPrice) + " / " + str(offerPrice) + "   " + str(bidSize) + " / " + str(offerSize))
+            print(k + "--->  " + str(bidPrice) + " / " + str(offerPrice) + "   " + str(bidSize) + " / " + str(offerSize))
 
             if len(self.actualMarket) == 2:
-                bidRF = self.getBidPx(self.actualMarket['RFX20Dic20'])
-                offRF = self.getOfferPx(self.actualMarket['RFX20Dic20'])
-                bidDO = self.getBidPx(self.actualMarket['DODic20'])
-                offDO = self.getOfferPx(self.actualMarket['DODic20'])
+
+                bidRF = self.getBidPx(self.actualMarket[self.tickers[0]])
+                offRF = self.getOfferPx(self.actualMarket[self.tickers[0]])
+                bidDO = self.getBidPx(self.actualMarket[self.tickers[1]])
+                offDO = self.getOfferPx(self.actualMarket[self.tickers[0]])
 
                 if bidDO != 0 and offDO != 0:
                     # print("RFX20Dic20 en USD: " + str(bidRF / offDO)+ " / " + str(offRF/bidDO))
                     print(
-                        "*RFX20Dic20 en USD: " + "{:.2f}".format(bidRF / offDO) + " / " + "{:.2f}".format(
+                        "**********RFX20Dic20 en USD: " + "{:.2f}".format(bidRF / offDO) + " / " + "{:.2f}".format(
                             offRF / bidDO))
+
+
 
     ### msg parser
     @staticmethod
