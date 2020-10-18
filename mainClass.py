@@ -1,28 +1,30 @@
 import sys
 import argparse
-import time
-import configparser
-from threading import Thread
 import quickfix as fix
-from RofexEngine.RofexEngine import rofexEngine
 
 
-# from RofexEngine.bots import bots
+from RofexEngine.MarketDataEntries import MarketEntries
+from Initiator.algos.ratioTest import ratioTest
+from RofexEngine.suscriptionObject import suscriptionObjet
+from RofexEngine.usrPswd import userID
 
 
 class main:
-    def __init__(self, config_file, usrId, pswd, targetCompID, tickers, entries):
-        # def __init__(self, config_file, usrId, pswd, targetCompID):
+
+    def __init__(self, config_file, usr1, targetCompID, suscribeObj):
         self.config_file = config_file
-        self.usrId = usrId
-        self.pswd = pswd
         self.targetCompID = targetCompID
-        self.tickers = tickers
-        self.entries = entries
+
+        self.usrId = userID.getUsr(usr1)
+        self.pswd = userID.getPswd(usr1)
+
+        self.tickers = suscriptionObjet.getTickers(suscribeObj)
+        self.entries = suscriptionObjet.getEntries(suscribeObj)
 
         try:
             self.settings = fix.SessionSettings(self.config_file)
-            self.myFixApplication = rofexEngine(self.usrId, self.pswd, self.targetCompID, self.tickers, self.entries)
+            # self.myFixApplication = rofexEngine(self.usrId, self.pswd, self.targetCompID, self.tickers, self.entries)
+            self.myFixApplication = ratioTest(self.usrId, self.pswd, self.targetCompID, self.tickers, self.entries)
             self.storefactory = fix.FileStoreFactory(self.settings)
             self.logfactory = fix.FileLogFactory(self.settings)
             self.initiator = fix.SocketInitiator(self.myFixApplication, self.storefactory, self.settings,
@@ -42,7 +44,6 @@ class main:
             sys.exit()
 
     def run(self):
-        print("Paso x run")
 
         while 1:
             # time.sleep(2)
@@ -69,7 +70,7 @@ class main:
         fixMain.initiator.stop()
 
     def queryAction(self):
-        print("1) Suscribir MD2\n2) SecList\n3) Print allSecuritiesList\n4) Actual Market\n5) Quit")
+        print("1) -----\n2) SecList\n3) Print allSecuritiesList\n4) Actual Market\n5) Quit")
         action = input("Action:\n")
         return action
 
@@ -81,11 +82,34 @@ if __name__ == '__main__':
     parser.add_argument('file_name', type=str, help='Name of configuration file')
     args = parser.parse_args()
 
+    user = userID('pjseoane232', 'AiZkiC5#')
     suscribeTuple = ['RFX20Dic20', 'DODic20']
-    entries = ['0', '1', '2', '4', '5', '6', '7', '8', 'B', 'C']
 
-    fixMain = main(args.file_name, 'pjseoane232', 'AiZkiC5#', 'ROFX', suscribeTuple, entries)
+    entries = [MarketEntries.Bid,
+               MarketEntries.Offer,
+               MarketEntries.Trade,
+               MarketEntries.Index,
+               MarketEntries.Open,
+               MarketEntries.Close,
+               MarketEntries.Settlement,
+               MarketEntries.High,
+               MarketEntries.Low,
+               MarketEntries.Vol,
+               MarketEntries.CashVol,
+               MarketEntries.TradeVol,
+               MarketEntries.OpInt,
+               MarketEntries.AuctionPrice,
+               MarketEntries.RefPrice
+               ]
 
+    suscribe = suscriptionObjet(suscribeTuple, entries)
+
+    fixMain = main(args.file_name, user, 'ROFX', suscribe)
+
+    # time.sleep(3)
+    # fixMain.myFixApplication.suscribeMD2(suscribeTuple, entries)
+
+    # fixMain.suscribeMD3(suscribeTuple, entries2)
     fixMain.initiator.start()
-    # fixMain.myFixApplication.run()
+
     fixMain.run()

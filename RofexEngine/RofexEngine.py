@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
-from typing import Dict, Any
 
 import quickfix as fix
 import quickfix50sp2 as fix50
 import logging
 
 from RofexEngine.onMessage import onMessage
-from RofexEngine.algosClass import algos
+from Initiator.algos.algosClass import algos
 
 # from RofexEngine.testRun import algo2
 
@@ -21,10 +20,8 @@ __SOH__ = chr(1)
 
 
 class rofexEngine(fix.Application):
-    allSecurities: Dict[Any, Any]
 
     def __init__(self, usr, pswd, targetCompId, tickers, entries):
-        # def __init__(self, usr, pswd, targetCompId):
         super().__init__()
         self.sessionID = None
         self.session_off = True
@@ -40,6 +37,7 @@ class rofexEngine(fix.Application):
         self.allSecurities = {}
         self.actualMarket = {}
         self.lastMsg = None
+        self.algoTEST = None
         self.algoTEST = algos(self.actualMarket,
                               tickers)  # crea el objeto algos con el diccionario de datos de las cotiz actuales
 
@@ -64,7 +62,7 @@ class rofexEngine(fix.Application):
         logfix.critical("Logged OK, sessionID >> (%s)" % self.sessionID)
 
         self.getSecuritiesList()
-        # self.suscribeMD(self.tickers, self.entries)
+        self.suscribeMD3()
 
         logfix.critical("onLogon, securitiesList Requested..., sessionID >> (%s)" % self.sessionID)
 
@@ -127,7 +125,7 @@ class rofexEngine(fix.Application):
         # the message. If it is set to false, the message will simply not be sent. Notice that the FIX::Message is
         # not const. This allows you to add fields to an application message before it is sent out.
         msg = self.formatMsg(message)
-        #tag35 = self.getTag35(message)
+        # tag35 = self.getTag35(message)
 
         if self.getTag35(message) == 'j':  # Business Message Reject
             logfix.warning("toApp -> Reject >> (%s)" % msg)
@@ -165,19 +163,18 @@ class rofexEngine(fix.Application):
 
         elif tag35 == 'W':  # MktData
             # print(self.getValue(message, fix.Symbol()))
+            # print("mensaje W")
             logfix.warning("MD <-- fromApp >> (%s) " % msg)
 
             self.lastMsg = onMessage(message).onMessage_MarketDataSnapshotFullRefresh()
-
+            self.actualMarket[self.lastMsg['instrumentId']['symbol']] = self.lastMsg
             self.goRobot()
+            # return self.lastMsg
 
         else:
             logfix.warning("Response <-- fromApp >> (%s) " % msg)
 
-
-
         ## Broadcast JSON to WebSocket
-
 
     def getSecuritiesList(self):
         msg = fix50.SecurityListRequest()
@@ -186,6 +183,36 @@ class rofexEngine(fix.Application):
         header.setField(fix.TargetCompID(self.targetCompID))
         msg.setField(fix.SecurityReqID('ListRequest1'))
         msg.setField(fix.SecurityListRequestType(4))
+
+        fix.Session.sendToTarget(msg)
+
+    def suscribeMD3(self):
+
+        print("SUSCRIBE MD3***************************************************************************")
+
+        msg = fix50.MarketDataRequest()
+        header = msg.getHeader()
+        header.setField(fix.SenderCompID(self.usrID))
+        header.setField(fix.TargetCompID(self.targetCompID))
+        # ---------------------
+        msg.setField(fix.MDReqID("ListaMktData"))
+        msg.setField(fix.SubscriptionRequestType('1'))
+        msg.setField(fix.MarketDepth(1))
+        msg.setField(fix.MDUpdateType(0))
+        msg.setField(fix.AggregatedBook(True))
+
+        # BlockMDReqGrp
+        group = fix50.MarketDataRequest().NoMDEntryTypes()
+        for field in self.entries:
+            group.setField(fix.MDEntryType(str(field)))
+            msg.addGroup(group)
+
+        # Symbols
+        norelatedsym = fix50.MarketDataRequest().NoRelatedSym()
+        for ticker in self.tickers:
+            norelatedsym.setField(fix.Symbol(ticker))
+            logfix.warning("--> Suscribe Ticker >> (%s)" % ticker)
+            msg.addGroup(norelatedsym)
 
         fix.Session.sendToTarget(msg)
 
@@ -244,8 +271,8 @@ class rofexEngine(fix.Application):
         """
         Message Header Builder
         """
-        self.msg = msg = fix.Message()
-        header = msg.getHeader()
+        self.msg = fix.Message()
+        header = self.msg.getHeader()
         header.setField(fix.BeginString(fix.BeginString_FIXT11))
         header.setField(fix.MsgType(msgType))
         header.setField(fix.SenderCompID(self.usrID))
@@ -261,7 +288,69 @@ class rofexEngine(fix.Application):
         print(self.allSecurities)
 
     def goRobot(self):
-        # va a al fiel algosClass y ahi ejecuta lo que tenga bajo goRobot
-        # self.onMessage_MarketDataSnapshotFullRefreshToDict()
-        self.algoTEST.addMsgToDict(self.lastMsg)
-        self.algoTEST.goRobot()
+
+        print(self.lastMsg)
+        # self.actualMarket[self.lastMsg['instrumentId']['symbol']] = self.lastMsg
+        # self.algoTEST.goRobot()
+
+    def getActualMktDict(self):
+        return self.actualMarket
+
+    def printMsg(self):
+        print(self.lastMsg)
+
+    # def goRobot2(self):
+    #    self.func()
+
+    @staticmethod
+    def getTicker(msg):
+        return msg['instrumentId']['symbol']
+
+    @staticmethod
+    def getBidPx(msg):
+        if len((msg['marketData']['BI'])) > 0:
+            return msg['marketData']['BI'][0]['price']
+        else:
+            return 0
+
+    @staticmethod
+    def getOfferPx(msg):
+        if len((msg['marketData']['OF'])) > 0:
+            return msg['marketData']['OF'][0]['price']
+        else:
+            return 0
+
+    @staticmethod
+    def getBidSize(msg):
+        if len((msg['marketData']['BI'])) > 0:
+            return msg['marketData']['BI'][0]['size']
+        else:
+            return 0
+
+    @staticmethod
+    def getOfferSize(msg):
+        if len((msg['marketData']['OF'])) > 0:
+            return msg['marketData']['OF'][0]['size']
+        else:
+            return 0
+
+    @staticmethod
+    def getLastPx(msg):
+        if len((msg['marketData']['LA'])) > 0:
+            return msg['marketData']['LA'][0]['price']
+        else:
+            return 0
+
+    @staticmethod
+    def getLastSize(msg):
+        if len((msg['marketData']['LA'])) > 0:
+            return msg['marketData']['LA'][0]['size']
+        else:
+            return 0
+
+    @staticmethod
+    def getTradeVol(msg):
+        if len((msg['marketData']['TV'])) > 0:
+            return msg['marketData']['TV']['size']
+        else:
+            return 0

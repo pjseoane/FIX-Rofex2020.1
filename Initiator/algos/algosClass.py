@@ -4,12 +4,8 @@ class algos:
         self.tickers=tickers
 
     def goRobot(self):
-        #print(self.actualMarket)
+        print(self.actualMarket)
         self.ratio2Tickers()
-
-    def addMsgToDict(self, lastMsg):
-        self.actualMarket[lastMsg['instrumentId']['symbol']] = lastMsg
-        #self.printFormatedMsg(lastMsg)
 
     def printFormatedMsg(self,last):
         actual=last
@@ -18,7 +14,8 @@ class algos:
         bidSize = self.getBidSize(actual)
         offerPrice = self.getOfferPx(actual)
         offerSize = self.getOfferSize(actual)
-        print(ticker + "line-->  " + str(bidPrice) + " / " + str(offerPrice) + "   " + str(bidSize) + " / " + str(offerSize))
+        last=self.getLast(actual)
+        print(ticker + " Bid / Ask / Last-->  " + str(bidPrice) + " / " + str(offerPrice) + "   " + str(bidSize) + " / " + str(offerSize) + " Last "+ str(last))
 
     def ratio2Tickers(self):
 
@@ -26,26 +23,20 @@ class algos:
 
         print('-------------------------------------------------')
         for k in keys:
-            actual=self.actualMarket[k]
-            bidPrice = self.getBidPx(actual)
-            bidSize = self.getBidSize(actual)
-            offerPrice = self.getOfferPx(actual)
-            offerSize = self.getOfferSize(actual)
-
-            print(k + "--->  " + str(bidPrice) + " / " + str(offerPrice) + "   " + str(bidSize) + " / " + str(offerSize))
+            self.printFormatedMsg(self.actualMarket[k])
 
             if len(self.actualMarket) == 2:
 
-                bidRF = self.getBidPx(self.actualMarket[self.tickers[0]])
-                offRF = self.getOfferPx(self.actualMarket[self.tickers[0]])
-                bidDO = self.getBidPx(self.actualMarket[self.tickers[1]])
-                offDO = self.getOfferPx(self.actualMarket[self.tickers[0]])
+                bidt0 = self.getBidPx(self.actualMarket[self.tickers[0]])
+                offt0 = self.getOfferPx(self.actualMarket[self.tickers[0]])
+                bidt1 = self.getBidPx(self.actualMarket[self.tickers[1]])
+                offt1 = self.getOfferPx(self.actualMarket[self.tickers[1]])
 
-                if bidDO != 0 and offDO != 0:
+                if bidt1 != 0 and offt1 != 0:
                     # print("RFX20Dic20 en USD: " + str(bidRF / offDO)+ " / " + str(offRF/bidDO))
                     print(
-                        "**********RFX20Dic20 en USD: " + "{:.2f}".format(bidRF / offDO) + " / " + "{:.2f}".format(
-                            offRF / bidDO))
+                        "**********RFX20Dic20 en USD: " + "{:.2f}".format(bidt0 / offt1) + " / " + "{:.2f}".format(
+                            offt0 / bidt1))
 
 
 
@@ -53,7 +44,7 @@ class algos:
     @staticmethod
     def getTicker(msg):
         return msg['instrumentId']['symbol']
-
+        #return msg['instrumentId']
     @staticmethod
     def getBidPx(msg):
         if len((msg['marketData']['BI'])) > 0:
@@ -82,6 +73,17 @@ class algos:
             return msg['marketData']['OF'][0]['size']
         else:
             return 0
+
+    @staticmethod
+    def getLast(msg):
+        """
+        if len((msg['marketData']['TV'])) > 0:
+            return msg['marketData']['TV'][0]['price']
+        else:
+            return 0
+        """
+        return 0
+
 
     def getBidDictActualMkt(self, ticker):
         return self.getBidPx(self.actualMarket[ticker])

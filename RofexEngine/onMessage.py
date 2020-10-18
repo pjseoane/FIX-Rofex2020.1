@@ -78,7 +78,8 @@ class onMessage:
 
         instrumentId = {"symbol": symbol, "marketId": marketId}
         data["instrumentId"] = instrumentId
-        data["marketData"] = {"BI": [], "OF": []}
+        #data["marketData"] = {"BI": [], "OF": []}
+        data["marketData"] = {"BI": [], "OF": [], "LA":[]}
 
         group = fix50.MarketDataSnapshotFullRefresh().NoMDEntries()
 
@@ -126,6 +127,11 @@ class onMessage:
                 elif entry_type == '1':
                     data["marketData"]["OF"].append(md)
                     tipo = 'OFFER'
+
+                ### lo agrego yo
+                elif entry_type=='2':
+                    data["marketData"]["LA"].append(md)
+                    tipo = 'LAST'
 
                 elif entry_type == 'B':
                     data["marketData"]["TV"] = md
@@ -265,3 +271,7 @@ class onMessage:
         key = field
         group.getField(key)
         return key.getValue()
+
+    @staticmethod
+    def getTicker(self):
+        return self.msg['instrumentId']['symbol']
