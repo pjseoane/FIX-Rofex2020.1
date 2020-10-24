@@ -1,5 +1,6 @@
 class suscriptionObjet:
     def __init__(self, tickers, entries):
+        self.__entries = entries
         self.__tickers = tickers
         # self.__entries = entries
         self.setEntries(entries)
@@ -22,6 +23,6 @@ class suscriptionObjet:
         if not all(elem in allowed_entries for elem in entries):
             self.__entries = allowed_entries
         else:
-            self.__entries = entries
+            pass
 
     entries = property(getEntries, setEntries)

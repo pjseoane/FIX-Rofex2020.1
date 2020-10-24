@@ -8,6 +8,7 @@ class ratioTest(rofexEngine):
         self.algoName = "2Tickets"
         self.ratioBid = 0
         self.ratioOffer = 0
+        print("ratioTest")
 
     def goRobot(self):
         print(self.algoName + "-------------------------------------------")
@@ -25,7 +26,7 @@ class ratioTest(rofexEngine):
 
         self.printTickerMkt()
         self.printRatio2Tickers()
-        #print(self.lastMsg)
+        print(self.lastMsg)
 
     def printTickerMkt(self):
 

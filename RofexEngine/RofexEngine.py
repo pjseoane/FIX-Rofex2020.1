@@ -6,9 +6,7 @@ import quickfix50sp2 as fix50
 import logging
 
 from RofexEngine.onMessage import onMessage
-from Initiator.algos.algosClass import algos
-
-# from RofexEngine.testRun import algo2
+from Algos.algosClass import algos
 
 
 logfix = logging.getLogger('FIX')  # 'FIX'
@@ -17,6 +15,10 @@ from Logger.logger import setup_logger2
 setup_logger2('FIX', 'Logs/message.log', logging.CRITICAL, logging.DEBUG)  # ,logging.DEBUG,logging.DEBUG)
 
 __SOH__ = chr(1)
+
+
+def formatMsg(message):
+    return message.toString().replace(__SOH__, "|")
 
 
 class rofexEngine(fix.Application):
@@ -38,13 +40,10 @@ class rofexEngine(fix.Application):
         self.actualMarket = {}
         self.lastMsg = None
         self.algoTEST = None
-        self.algoTEST = algos(self.actualMarket,
-                              tickers)  # crea el objeto algos con el diccionario de datos de las cotiz actuales
+        #self.algoTEST = algos(self.actualMarket, tickers)  # crea el objeto Algos con el diccionario de datos de las cotiz actuales
 
         self.tag35 = None
-
-    def formatMsg(self, message):
-        return message.toString().replace(__SOH__, "|")
+        #print("rofexEngineee")
 
     def onCreate(self, sessionID):
         # onCreate is called when quickfix creates a new session. A session comes into and remains in existence for
@@ -62,6 +61,8 @@ class rofexEngine(fix.Application):
         logfix.critical("Logged OK, sessionID >> (%s)" % self.sessionID)
 
         self.getSecuritiesList()
+        print(
+            "suscribeMD3 called--------------------------------------------------------------------------------------------")
         self.suscribeMD3()
 
         logfix.critical("onLogon, securitiesList Requested..., sessionID >> (%s)" % self.sessionID)
@@ -77,8 +78,9 @@ class rofexEngine(fix.Application):
         # to the counter party. This is normally not useful for an application however it is provided for any logging
         # you may wish to do. Notice that the FIX::Message is not const.
         # This allows you to add fields to an adminstrative message before it is sent out.
-        msg = self.formatMsg(message)
-        tag35 = self.getTag35(message)
+        msg = formatMsg(message)
+        # tag35 = self.getTag35(message)
+        tag35 = onMessage(message).getTag35()
 
         if tag35 == fix.MsgType_Logon:  # 'A':
             message.getHeader().setField(553, self.usrID)
@@ -101,8 +103,9 @@ class rofexEngine(fix.Application):
         # fromAdmin notifies you when an administrative message is sent from a counterparty to your FIX engine. This
         # can be usefull for doing extra validation on logon messages like validating passwords. Throwing a
         # RejectLogon exception will disconnect the counterparty.
-        msg = self.formatMsg(message)
-        tag35 = self.getTag35(message)
+        msg = formatMsg(message)
+        # tag35 = self.getTag35(message)
+        tag35 = onMessage(message).getTag35()
 
         if tag35 == '0':  # Heartbeat
             logfix.info("<-heartbeat>> (%s)" % msg)
@@ -124,10 +127,11 @@ class rofexEngine(fix.Application):
         # If a DoNotSend exception is thrown and the flag is set to true, a sequence reset will be sent in place of
         # the message. If it is set to false, the message will simply not be sent. Notice that the FIX::Message is
         # not const. This allows you to add fields to an application message before it is sent out.
-        msg = self.formatMsg(message)
+        msg = formatMsg(message)
         # tag35 = self.getTag35(message)
+        tag35 = onMessage(message).getTag35()
 
-        if self.getTag35(message) == 'j':  # Business Message Reject
+        if tag35 == 'j':  # Business Message Reject
             logfix.warning("toApp -> Reject >> (%s)" % msg)
         else:
             logfix.warning("toApp -> >> (%s)" % msg)
@@ -142,8 +146,9 @@ class rofexEngine(fix.Application):
         # process those types of messages. An IncorrectTagValue can also be thrown if a field contains a value you do
         # not support.
         # ACA SE PROCESAN LOS MENSAJES QUE ENTRAN
-        msg = self.formatMsg(message)
-        tag35 = self.getTag35(message)
+        msg = formatMsg(message)
+        # tag35 = self.getTag35(message)
+        tag35 = onMessage(message).getTag35()
 
         if tag35 == 'B':  # News
             logfix.warning("News <-- fromApp >> (%s) " % msg)
@@ -250,8 +255,8 @@ class rofexEngine(fix.Application):
             msg.addGroup(norelatedsym)
         fix.Session.sendToTarget(msg)
 
-    def getTag35(self, message):
-        return message.getHeader().getField(35)
+    # def getTag35(self, message):
+    #    return message.getHeader().getField(35)
 
     def testRequest(self):  # , message):
         """
@@ -288,10 +293,11 @@ class rofexEngine(fix.Application):
         print(self.allSecurities)
 
     def goRobot(self):
-
-        print(self.lastMsg)
+        algoTEST = algos(self.actualMarket, self.tickers, self.lastMsg) # crea el objeto Algos con el diccionario de datos de las cotiz actuales
+        algoTEST.goRobot()
+        #print(self.lastMsg)
         # self.actualMarket[self.lastMsg['instrumentId']['symbol']] = self.lastMsg
-        # self.algoTEST.goRobot()
+
 
     def getActualMktDict(self):
         return self.actualMarket
@@ -317,6 +323,13 @@ class rofexEngine(fix.Application):
     def getOfferPx(msg):
         if len((msg['marketData']['OF'])) > 0:
             return msg['marketData']['OF'][0]['price']
+        else:
+            return 0
+
+    @staticmethod
+    def getClose(msg):
+        if len((msg['marketData']['CL'])) > 0:
+            return msg['marketData']['CL'][0]['price']
         else:
             return 0
 
@@ -350,7 +363,14 @@ class rofexEngine(fix.Application):
 
     @staticmethod
     def getTradeVol(msg):
-        if len((msg['marketData']['TV'])) > 0:
-            return msg['marketData']['TV']['size']
-        else:
-            return 0
+        # pass
+
+        try:
+            if len((msg['marketData']['TV'])) > 0:
+                return msg['marketData']['TV']['size']
+            else:
+                return 0
+        except() as e:
+            print(e)
+
+        return

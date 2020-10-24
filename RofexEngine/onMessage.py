@@ -7,6 +7,12 @@ class onMessage:
     def __init__(self, msg):
         self.message = msg
 
+    def getTag35(self):
+        return self.message.getHeader().getField(35)
+
+    def getTag52(self):
+        return self.message.getHeader().getField(52)
+
     def onMessage_SecurityList(self) -> dict:
         group = fix50.SecurityList().NoRelatedSym()
         # print(group)
@@ -16,7 +22,7 @@ class onMessage:
 
         mktSegment = {}
         tickerData = {}
-        #allSecurities = {}
+        # allSecurities = {}
 
         for tickers in range(1, noRelatedSym + 1):
             self.message.getGroup(tickers, group)
@@ -39,7 +45,7 @@ class onMessage:
         mktSegment[mktSegmentID] = tickerData
 
         # para unir todos los diccionarios en 1
-        #allSecurities[mktSegmentID] = mktSegment
+        # allSecurities[mktSegmentID] = mktSegment
         return mktSegment
 
     def onMessage_MarketDataSnapshotFullRefresh(self):
@@ -76,10 +82,11 @@ class onMessage:
         ## Market ID (ROFX, BYMA)
         marketId = self.getValue(fix.SecurityExchange())
 
+        data['timestamp'] = self.getTag52()
         instrumentId = {"symbol": symbol, "marketId": marketId}
         data["instrumentId"] = instrumentId
-        #data["marketData"] = {"BI": [], "OF": []}
-        data["marketData"] = {"BI": [], "OF": [], "LA":[]}
+        # data["marketData"] = {"BI": [], "OF": []}
+        data["marketData"] = {"BI": [], "OF": [], "LA": [], "CL": [], "ST": [], "OI": []}
 
         group = fix50.MarketDataSnapshotFullRefresh().NoMDEntries()
 
@@ -129,13 +136,25 @@ class onMessage:
                     tipo = 'OFFER'
 
                 ### lo agrego yo
-                elif entry_type=='2':
+                elif entry_type == '2':
                     data["marketData"]["LA"].append(md)
                     tipo = 'LAST'
+
+                elif entry_type == '5':
+                    data["marketData"]["CL"].append(md)
+                    tipo = 'CLOSE'
+
+                elif entry_type == '6':
+                    data["marketData"]["ST"].append(md)
+                    tipo = 'Settlement'
 
                 elif entry_type == 'B':
                     data["marketData"]["TV"] = md
                     tipo = 'TRADE VOLUME'
+
+                elif entry_type == 'C':
+                    data["marketData"]["OI"] = md
+                    tipo = 'Open Interest'
 
                 else:
                     tipo = entry_type
@@ -240,6 +259,7 @@ class onMessage:
 
         print(table.draw())
 
+
     # Wrappers for get(Field)
 
     def getValue(self, field):
@@ -272,6 +292,10 @@ class onMessage:
         group.getField(key)
         return key.getValue()
 
+
+"""
     @staticmethod
     def getTicker(self):
         return self.msg['instrumentId']['symbol']
+        
+"""

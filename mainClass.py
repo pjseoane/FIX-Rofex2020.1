@@ -1,10 +1,11 @@
 import sys
 import argparse
 import quickfix as fix
-
+import time
 
 from RofexEngine.MarketDataEntries import MarketEntries
-from Initiator.algos.ratioTest import ratioTest
+from RofexEngine.RofexEngine import rofexEngine
+from Algos.ratioTest import ratioTest
 from RofexEngine.suscriptionObject import suscriptionObjet
 from RofexEngine.usrPswd import userID
 
@@ -12,6 +13,7 @@ from RofexEngine.usrPswd import userID
 class main:
 
     def __init__(self, config_file, usr1, targetCompID, suscribeObj):
+        # def __init__(self, config_file, usr1, targetCompID, suscribeObj,algo):
         self.config_file = config_file
         self.targetCompID = targetCompID
 
@@ -20,11 +22,13 @@ class main:
 
         self.tickers = suscriptionObjet.getTickers(suscribeObj)
         self.entries = suscriptionObjet.getEntries(suscribeObj)
+        # self.algo=algo
 
         try:
             self.settings = fix.SessionSettings(self.config_file)
-            # self.myFixApplication = rofexEngine(self.usrId, self.pswd, self.targetCompID, self.tickers, self.entries)
-            self.myFixApplication = ratioTest(self.usrId, self.pswd, self.targetCompID, self.tickers, self.entries)
+
+            #self.myFixApplication = ratioTest(self.usrId, self.pswd, self.targetCompID, self.tickers, self.entries)
+            self.myFixApplication= rofexEngine(self.usrId, self.pswd, self.targetCompID, self.tickers, self.entries)
             self.storefactory = fix.FileStoreFactory(self.settings)
             self.logfactory = fix.FileLogFactory(self.settings)
             self.initiator = fix.SocketInitiator(self.myFixApplication, self.storefactory, self.settings,
@@ -106,10 +110,6 @@ if __name__ == '__main__':
 
     fixMain = main(args.file_name, user, 'ROFX', suscribe)
 
-    # time.sleep(3)
-    # fixMain.myFixApplication.suscribeMD2(suscribeTuple, entries)
-
-    # fixMain.suscribeMD3(suscribeTuple, entries2)
+    #time.sleep(3)
     fixMain.initiator.start()
-
     fixMain.run()
