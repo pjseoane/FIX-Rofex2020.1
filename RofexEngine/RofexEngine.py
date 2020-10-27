@@ -8,7 +8,6 @@ import logging
 from RofexEngine.onMessage import onMessage
 from Algos.algosClass import algos
 
-
 logfix = logging.getLogger('FIX')  # 'FIX'
 from Logger.logger import setup_logger2
 
@@ -39,11 +38,12 @@ class rofexEngine(fix.Application):
         self.allSecurities = {}
         self.actualMarket = {}
         self.lastMsg = None
+        self.previousMsg=None
         self.algoTEST = None
-        #self.algoTEST = algos(self.actualMarket, tickers)  # crea el objeto Algos con el diccionario de datos de las cotiz actuales
+        # self.algoTEST = algos(self.actualMarket, tickers)  # crea el objeto Algos con el diccionario de datos de las cotiz actuales
 
         self.tag35 = None
-        #print("rofexEngineee")
+        # print("rofexEngineee")
 
     def onCreate(self, sessionID):
         # onCreate is called when quickfix creates a new session. A session comes into and remains in existence for
@@ -58,19 +58,21 @@ class rofexEngine(fix.Application):
         # connection has been established and the FIX logon process has completed with both parties exchanging valid
         # logon messages.
         self.session_off = False
+        self.sessionID=sessionID
         logfix.critical("Logged OK, sessionID >> (%s)" % self.sessionID)
 
         self.getSecuritiesList()
-        print(
-            "suscribeMD3 called--------------------------------------------------------------------------------------------")
+
         self.suscribeMD3()
 
         logfix.critical("onLogon, securitiesList Requested..., sessionID >> (%s)" % self.sessionID)
+        logfix.critical("onLogon, suscribeMD3() Requested..., sessionID >> (%s)" % self.sessionID)
 
     def onLogout(self, sessionID):
         # onLogout notifies you when an FIX session is no longer online. This could happen during a normal logout
         # exchange or because of a forced termination or a loss of network connection.
         self.session_off = True
+        self.sessionID=sessionID
         logfix.critical("onLogout OK, bye Rofex >> (%s)" % self.sessionID)
 
     def toAdmin(self, message, sessionID):
@@ -79,6 +81,7 @@ class rofexEngine(fix.Application):
         # you may wish to do. Notice that the FIX::Message is not const.
         # This allows you to add fields to an adminstrative message before it is sent out.
         msg = formatMsg(message)
+        #self.sessionID=sessionID
         # tag35 = self.getTag35(message)
         tag35 = onMessage(message).getTag35()
 
@@ -104,6 +107,7 @@ class rofexEngine(fix.Application):
         # can be usefull for doing extra validation on logon messages like validating passwords. Throwing a
         # RejectLogon exception will disconnect the counterparty.
         msg = formatMsg(message)
+        self.sessionID=sessionID
         # tag35 = self.getTag35(message)
         tag35 = onMessage(message).getTag35()
 
@@ -147,12 +151,13 @@ class rofexEngine(fix.Application):
         # not support.
         # ACA SE PROCESAN LOS MENSAJES QUE ENTRAN
         msg = formatMsg(message)
+        self.sessionID=sessionID
         # tag35 = self.getTag35(message)
         tag35 = onMessage(message).getTag35()
 
         if tag35 == 'B':  # News
-            logfix.warning("News <-- fromApp >> (%s) " % msg)
-
+            #logfix.warning("News <-- fromApp >> (%s) " % msg)
+            pass
         elif tag35 == 'h':  # Trading Session Status
             logfix.info("Trading Session Status <-- fromApp >> (%s) " % msg)
 
@@ -172,9 +177,8 @@ class rofexEngine(fix.Application):
             logfix.warning("MD <-- fromApp >> (%s) " % msg)
 
             self.lastMsg = onMessage(message).onMessage_MarketDataSnapshotFullRefresh()
-            self.actualMarket[self.lastMsg['instrumentId']['symbol']] = self.lastMsg
-            self.goRobot()
-            # return self.lastMsg
+            #self.actualMarket[self.lastMsg['instrumentId']['symbol']] = self.lastMsg
+            self.goRobot2()
 
         else:
             logfix.warning("Response <-- fromApp >> (%s) " % msg)
@@ -221,42 +225,6 @@ class rofexEngine(fix.Application):
 
         fix.Session.sendToTarget(msg)
 
-    def suscribeMD(self):
-        print("SUSCRIBE MD***************************************************************************")
-        if len(self.tickers) == 0 or len(self.entries) == 0:
-            return
-
-        allowed_entries = ['0', '1', '2', '4', '5', '6', '7', '8', 'B', 'C']
-        if not all(elem in allowed_entries for elem in self.entries):
-            return
-
-        msg = fix50.MarketDataRequest()
-        header = msg.getHeader()
-        header.setField(fix.SenderCompID(self.usrID))
-        header.setField(fix.TargetCompID(self.targetCompID))
-        # ---------------------
-        msg.setField(fix.MDReqID("ListaMktData"))
-        msg.setField(fix.SubscriptionRequestType('1'))
-        msg.setField(fix.MarketDepth(1))
-        msg.setField(fix.MDUpdateType(0))
-        msg.setField(fix.AggregatedBook(True))
-
-        # BlockMDReqGrp
-        group = fix50.MarketDataRequest().NoMDEntryTypes()
-        for field in self.entries:
-            group.setField(fix.MDEntryType(str(field)))
-            msg.addGroup(group)
-
-        # Symbols
-        norelatedsym = fix50.MarketDataRequest().NoRelatedSym()
-        for ticker in self.tickers:
-            norelatedsym.setField(fix.Symbol(ticker))
-            logfix.warning("--> Suscribe Ticker >> (%s)" % ticker)
-            msg.addGroup(norelatedsym)
-        fix.Session.sendToTarget(msg)
-
-    # def getTag35(self, message):
-    #    return message.getHeader().getField(35)
 
     def testRequest(self):  # , message):
         """
@@ -276,13 +244,13 @@ class rofexEngine(fix.Application):
         """
         Message Header Builder
         """
-        self.msg = fix.Message()
+        msg = fix.Message()
         header = self.msg.getHeader()
         header.setField(fix.BeginString(fix.BeginString_FIXT11))
         header.setField(fix.MsgType(msgType))
         header.setField(fix.SenderCompID(self.usrID))
         header.setField(fix.TargetCompID(self.targetCompID))
-        return self.msg
+        return msg
 
     """
     def run(self):
@@ -292,85 +260,21 @@ class rofexEngine(fix.Application):
     def printAllSecurities(self):
         print(self.allSecurities)
 
-    def goRobot(self):
-        algoTEST = algos(self.actualMarket, self.tickers, self.lastMsg) # crea el objeto Algos con el diccionario de datos de las cotiz actuales
-        algoTEST.goRobot()
-        #print(self.lastMsg)
+    #def goRobot(self):
+    #    pass
+        #algoTEST = algos(self.actualMarket, self.tickers, self.lastMsg)  # crea el objeto Algos con el diccionario de datos de las cotiz actuales
+        #algoTEST.goRobot()
+        # print(self.lastMsg)
         # self.actualMarket[self.lastMsg['instrumentId']['symbol']] = self.lastMsg
-
 
     def getActualMktDict(self):
         return self.actualMarket
 
-    def printMsg(self):
+    def printActualMktDict(self):
+        print(self.getActualMktDict())
+
+    def printLastMsg(self):
         print(self.lastMsg)
 
-    # def goRobot2(self):
-    #    self.func()
 
-    @staticmethod
-    def getTicker(msg):
-        return msg['instrumentId']['symbol']
 
-    @staticmethod
-    def getBidPx(msg):
-        if len((msg['marketData']['BI'])) > 0:
-            return msg['marketData']['BI'][0]['price']
-        else:
-            return 0
-
-    @staticmethod
-    def getOfferPx(msg):
-        if len((msg['marketData']['OF'])) > 0:
-            return msg['marketData']['OF'][0]['price']
-        else:
-            return 0
-
-    @staticmethod
-    def getClose(msg):
-        if len((msg['marketData']['CL'])) > 0:
-            return msg['marketData']['CL'][0]['price']
-        else:
-            return 0
-
-    @staticmethod
-    def getBidSize(msg):
-        if len((msg['marketData']['BI'])) > 0:
-            return msg['marketData']['BI'][0]['size']
-        else:
-            return 0
-
-    @staticmethod
-    def getOfferSize(msg):
-        if len((msg['marketData']['OF'])) > 0:
-            return msg['marketData']['OF'][0]['size']
-        else:
-            return 0
-
-    @staticmethod
-    def getLastPx(msg):
-        if len((msg['marketData']['LA'])) > 0:
-            return msg['marketData']['LA'][0]['price']
-        else:
-            return 0
-
-    @staticmethod
-    def getLastSize(msg):
-        if len((msg['marketData']['LA'])) > 0:
-            return msg['marketData']['LA'][0]['size']
-        else:
-            return 0
-
-    @staticmethod
-    def getTradeVol(msg):
-        # pass
-
-        try:
-            if len((msg['marketData']['TV'])) > 0:
-                return msg['marketData']['TV']['size']
-            else:
-                return 0
-        except() as e:
-            print(e)
-
-        return

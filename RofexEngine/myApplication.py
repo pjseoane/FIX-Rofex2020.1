@@ -1,50 +1,78 @@
-class algos:
-    def __init__(self, actualMarket, tickers, lastMsg):
-        self.actualMarket = actualMarket
-        self.tickers = tickers
-        self.lastMsg = lastMsg
+import os
+
+from RofexEngine.RofexEngine import rofexEngine
+
+
+def clear():
+    # for windows
+    if os.name == 'nt':
+        _ = os.system('cls')
+
+        # for mac and linux(here, os.name is 'posix')
+    else:
+        _ = os.system('clear')
+
+
+class myApplication(rofexEngine):
+
+    def __init__(self, usr, pswd, targetCompId, tickers, entries):
+        super().__init__(usr, pswd, targetCompId, tickers, entries)
+        self.previousLast = None
+        self.Last = None
 
         self.ratioBid = 0
         self.ratioOffer = 0
-        self.tickSecuence = []
-        self.ticks = {}
-        self.previousLast=0
-        self.Last=1
 
-    def goRobot(self):
-
-        print(self.lastMsg)
+    def goRobot2(self):
+        # clear()
+        # os.system('clear')
+       #self.getPreviousLast()
+        #
+        self.updateActualMktDict()
+        # self.printActualMktDict()
         # self.processTick()
-        self.updateActualMkt()
         self.printActualMkt()
         self.ratio2Tickers()
         self.printRatio2Tickers()
 
-    def updateActualMkt(self):
+    def updateActualMktDict(self):
         ticker = self.lastMsg['instrumentId']['symbol']
-        self.previousLast=self.Last
-        #self.Last=self.getFieldValue(ticker,'LA', 'price')
+        #self.previousLast = self.getPreviousLast()
+        self.actualMarket[self.lastMsg['instrumentId']['symbol']] = self.lastMsg
+
         self.actualMarket[ticker] = self.lastMsg
-        self.Last=self.getFieldValue(ticker,'LA', 'price')
-        print("+++++++++ PLast:"+str(self.previousLast))
-        print("+++++++++ Last :"+str(self.Last))
+        self.Last = self.getFieldValue(ticker, 'LA', 'price')
+        print("+++++++++ PLast:" + str(self.previousLast))
+        print("+++++++++ Last :" + str(self.Last))
+        self.previousLast=self.Last
+    def getPreviousLast(self):
+        if len(self.actualMarket) > 2:
+            ticker = self.lastMsg['instrumentId']['symbol']
+            return self.getFieldValue(ticker, 'LA', 'price')
+        else:
+            return 0
+
 
     def processTick(self):
         # toma el precio del dict antes de actualizar
         ticker = self.actualMarket['instrumentId']['symbol']
-        previousLast= self.getFieldValue(ticker,)
+        # previousLast= self.getFieldValue(ticker,)
 
         pass
 
     def printActualMkt(self):
+        # clear()
+        # os.system('cls')
         keys = self.actualMarket.keys()
         for k in keys:
-            print(k + "   " + str(self.getFieldValue(k, 'BI', 'price')) + " / " + str(
-                self.getFieldValue(k, 'OF', 'price')) + "   " +
-                  str(self.getFieldValue(k, 'BI', 'size')) + " /  " +
+            print(k + "   " +
+                  str(self.getFieldValue(k, 'BI', 'price')) + " / " +
+                  str(self.getFieldValue(k, 'OF', 'price')) + "   " +
+                  str(self.getFieldValue(k, 'BI', 'size')) + " / " +
                   str(self.getFieldValue(k, 'OF', 'size')) + "     " + "Last :" +
-                  str(self.getFieldValue(k, 'LA', 'price')) + "    " +
-                  str(self.getFieldValue(k, 'LA', 'size')) +"Previous Last :"+ str(self.previousLast)+ "   " + " Close :" +
+                  str(self.getFieldValue(k, 'LA', 'price')) + "     " +
+                  str(self.getFieldValue(k, 'LA', 'size')) + "     " + "Previous Last :" +
+                  str(self.previousLast) + "   " + " Close :" +
                   str(self.getFieldValue(k, 'CL', 'price')))
         # print("***********************  *********** ************* ************ *********** ")
 
@@ -54,9 +82,6 @@ class algos:
 
     def ratio2Tickers(self):
 
-        # keys = self.actualMarket.keys()
-
-        # print('-------------------------------------------------')
         if len(self.actualMarket) == 2:
 
             bidt0 = self.getFieldValue(self.tickers[0], 'BI', 'price')
